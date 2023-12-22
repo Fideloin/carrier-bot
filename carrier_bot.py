@@ -260,8 +260,9 @@ def generate_get_trips_msg(user_id):
                                f"Дата поездки в Испанию: {trip['to_spain_date']},\n" \
                                f"Примечание: {trip['note']}\n\n"
             button = [{f"text": f"Удалить поездку {i}.", "callback_data": f"/deletetrip_{trip['trip_id']}"}]
-            GETMYTRIPS_INLINE_KEYBOARD["inline_keyboard"].insert(i - 1, button)
-    return getmytrips_text, GETMYTRIPS_INLINE_KEYBOARD
+            local_getmytrips_inline_keyboard = GETMYTRIPS_INLINE_KEYBOARD
+            local_getmytrips_inline_keyboard["inline_keyboard"].insert(i - 1, button)
+    return getmytrips_text, local_getmytrips_inline_keyboard
 
 
 def handle_startcallback(chat_id, message_id):

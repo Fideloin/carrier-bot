@@ -1,24 +1,28 @@
 import logging
-import urllib.request
-import urllib.parse
-import urllib.error
 import json
 import re
 import os
+import time
+import urllib.request
+import urllib.parse
+import urllib.error
+
 from datetime import datetime
 import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import BotoCoreError, ClientError
-import time
+
 from vars import *
 
-
-TELEGRAM_API_KEY = os.environ['TELEGRAM_API_KEY']
-TELEGRAM_BOT_API = f"https://api.telegram.org/bot{TELEGRAM_API_KEY}/"
 DYNAMODB_TABLE_NAME = os.environ.get('DYNAMODB_TABLE_NAME')
+TELEGRAM_API_KEY = os.environ['TELEGRAM_API_KEY']
+
+TELEGRAM_BOT_API = f"https://api.telegram.org/bot{TELEGRAM_API_KEY}/"
+
 START_COMMAND = '/start'
 ABOUT_COMMAND = '/about'
 HELP_COMMAND = '/help'
+
 DUMMY_DATE = '1900-01-01'
 
 logger = logging.getLogger()
@@ -199,12 +203,12 @@ def get_trips(is_to_belarus, yyyy, mm):
         # Define the key condition expression for querying DynamoDB.
         if is_to_belarus:  # If interested in trip to Belarus
             index_name = 'to_belarus_date-index'
-            key_condition = Key('dummy_partition_key').eq('constant') & \
-                            Key('to_belarus_date').between(str(from_date), str(to_date))
+            key_condition = Key('dummy_partition_key').eq('constant') & Key('to_belarus_date').between(str(from_date),
+                                                                                                       str(to_date))
         else:  # If interested in trip to Spain
             index_name = 'to_spain_date-index'
-            key_condition = Key('dummy_partition_key').eq('constant') & \
-                            Key('to_spain_date').between(str(from_date), str(to_date))
+            key_condition = Key('dummy_partition_key').eq('constant') & Key('to_spain_date').between(str(from_date),
+                                                                                                     str(to_date))
         # Query DynamoDB.
         response = table.query(
             IndexName=index_name,
@@ -245,6 +249,7 @@ def generate_get_trips_msg(user_id):
     :return: List with message text and inline keyboard dict
     """
     trips = get_my_trips(user_id)
+    local_getmytrips_inline_keyboard = GETMYTRIPS_INLINE_KEYBOARD
     if not trips:
         getmytrips_text = "У вас нет предстоящих поездок"
     else:
@@ -255,12 +260,12 @@ def generate_get_trips_msg(user_id):
             if trip["to_spain_date"] == DUMMY_DATE:
                 trip["to_spain_date"] = "-"
             getmytrips_text += f"{i}. " \
-                               f"Ваш контакт, как он отобразится в поиске: <a href=\"tg://user?id={trip['user_id']}\">{trip['first_name']}</a>,\n" \
+                               f"Ваш контакт, как он отобразится в поиске: " \
+                               f"<a href=\"tg://user?id={trip['user_id']}\">{trip['first_name']}</a>,\n" \
                                f"Дата поездки в Беларусь: {trip['to_belarus_date']},\n" \
                                f"Дата поездки в Испанию: {trip['to_spain_date']},\n" \
                                f"Примечание: {trip['note']}\n\n"
             button = [{f"text": f"Удалить поездку {i}.", "callback_data": f"/deletetrip_{trip['trip_id']}"}]
-            local_getmytrips_inline_keyboard = GETMYTRIPS_INLINE_KEYBOARD
             local_getmytrips_inline_keyboard["inline_keyboard"].insert(i - 1, button)
     return getmytrips_text, local_getmytrips_inline_keyboard
 
@@ -460,14 +465,14 @@ def process_update(update):
 
 
 def lambda_handler(event, context):
-    '''
+    """
     The Lambda function handler. Processes an incoming event and passes the event body to process_update() method
 
     :param event: The incoming event data
     :param context: The Lambda context object.
     :return: dict: A dictionary containing HTTP response code and body.
         Always returns 200 to make sure that agent won't spam to server
-    '''
+    """
     event_processed = {"statusCode": 200, "body": json.dumps({})}
     try:
         update = json.loads(event['body'])

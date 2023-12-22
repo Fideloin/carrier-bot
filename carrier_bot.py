@@ -6,8 +6,9 @@ import time
 import urllib.request
 import urllib.parse
 import urllib.error
-
 from datetime import datetime
+from copy import deepcopy
+
 import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import BotoCoreError, ClientError
@@ -249,7 +250,7 @@ def generate_get_trips_msg(user_id):
     :return: List with message text and inline keyboard dict
     """
     trips = get_my_trips(user_id)
-    local_getmytrips_inline_keyboard = GETMYTRIPS_INLINE_KEYBOARD
+    local_getmytrips_inline_keyboard = deepcopy(GETMYTRIPS_INLINE_KEYBOARD)
     if not trips:
         getmytrips_text = "У вас нет предстоящих поездок"
     else:

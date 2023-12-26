@@ -13,18 +13,16 @@ import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import BotoCoreError, ClientError
 
-from vars import *
+from vars import START_COMMAND, ABOUT_COMMAND, HELP_COMMAND, DUMMY_DATE, GETMYTRIPS_INLINE_KEYBOARD, GREETING_TEXT, \
+    GREETING_INLINE_KEYBOARD, SEARCH_INTRO_TEXT, SEARCH_INTRO_INLINE_KEYBOARD, SEARCH_SPAIN_TIME_TEXT, \
+    SEARCH_BELARUS_TIME_TEXT, SAVETRIP_STEP3_TEXT, SAVETRIP_STEP2_TEXT, SAVETRIP_STEP1_TEXT, GENERIC_ERROR_TEXT, \
+    SAVE_SUCCESS_INLINE_KEYBOARD, SAVE_SUCCESS_TEXT, INCORRECT_DATE_INLINE_KEYBOARD, INCORRECT_DATE_TEXT, \
+    SEARCH_END_KEYBOARD, INCORRECT_SEARCH_DATE_TEXT, HELP_TEXT, ABOUT_SECOND_MSG_TEXT, ABOUT_TEXT
 
 DYNAMODB_TABLE_NAME = os.environ.get('DYNAMODB_TABLE_NAME')
 TELEGRAM_API_KEY = os.environ['TELEGRAM_API_KEY']
 
 TELEGRAM_BOT_API = f"https://api.telegram.org/bot{TELEGRAM_API_KEY}/"
-
-START_COMMAND = '/start'
-ABOUT_COMMAND = '/about'
-HELP_COMMAND = '/help'
-
-DUMMY_DATE = '1900-01-01'
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -49,8 +47,8 @@ def send_telegram_api_request(operation, data, headers=None):
         headers = {"Content-Type": "application/json"}
     try:
         request = urllib.request.Request(url, data, headers)
-        response = urllib.request.urlopen(request).read().decode("utf-8")
-        return json.loads(response)
+        with urllib.request.urlopen(request).read().decode("utf-8") as response:
+            return json.loads(response)
     except urllib.error.HTTPError as error:
         logger.error(error.reason)
         return {"error": str(error.reason)}
@@ -90,15 +88,16 @@ def send_message(chat_id, text, reply_markup=None, parse_mode=None):
     return send_telegram_api_request("sendMessage", data)
 
 
-def send_editMessageText(chat_id, message_id, text, reply_markup=None, parse_mode=None):
-    data = create_data_dictionary(chat_id, text, message_id=message_id, reply_markup=reply_markup, parse_mode=parse_mode)
+def send_edit_message_text(chat_id, message_id, text, reply_markup=None, parse_mode=None):
+    data = create_data_dictionary(chat_id, text, message_id=message_id, reply_markup=reply_markup,
+                                  parse_mode=parse_mode)
     return send_telegram_api_request("editMessageText", data)
 
 
-def send_answerCallbackQuery(callback_query_id, text=None, show_alert=False):
+def send_answer_callback_query(callback_query_id, text=None, show_alert=False):
     """
     Sends an answer to a callback query.
-    :param callback_query_id: The ID of the the callback query to answer.
+    :param callback_query_id: The ID of the callback query to answer.
     :param text: Optional; the text to send in the answer. Defaults to None.
     :param show_alert: Optional; determines whether an alert will be shown. Defaults to False.
     :return: Response from the sendRequest function
@@ -119,10 +118,10 @@ def message_data_encode(text, data_to_encode):
     :param data_to_encode: The data to encode into the text.
     :return: An encoded message string.
     """
-    zerowidth_character = "\u200C"
+    zero_width_character = "\u200C"
     base_url = "https://t.me/?encoded="
     encoded_url = base_url + urllib.parse.quote_plus(data_to_encode)
-    html_markup = f"<a href=\"{encoded_url}\">{zerowidth_character}</a>"
+    html_markup = f"<a href=\"{encoded_url}\">{zero_width_character}</a>"
     text = str(text) + html_markup
     return text
 
@@ -137,8 +136,7 @@ def message_data_decode(text):
     result = re.findall(regex, text)
     if result and result[0]:
         return urllib.parse.unquote_plus(result[0])
-    else:
-        return None
+    return None
 
 
 def delete_trip(user_id, trip_id):
@@ -153,6 +151,7 @@ def delete_trip(user_id, trip_id):
         return response
     except (BotoCoreError, ClientError) as error:
         logger.error(f"Failed to delete trip: {error}")
+        return None
 
 
 def save_trip_data(user_id, trip_data):
@@ -169,6 +168,7 @@ def save_trip_data(user_id, trip_data):
         return response
     except Exception as e:
         logger.error(f'Failed to save item to DynamoDB: {str(e)}')
+        return None
 
 
 def get_my_trips(user_id):
@@ -184,6 +184,7 @@ def get_my_trips(user_id):
         return response['Items']
     except (BotoCoreError, ClientError) as error:
         logger.error(f"Failed to query trips: {error}")
+        return None
 
 
 def get_trips(is_to_belarus, yyyy, mm):
@@ -204,12 +205,12 @@ def get_trips(is_to_belarus, yyyy, mm):
         # Define the key condition expression for querying DynamoDB.
         if is_to_belarus:  # If interested in trip to Belarus
             index_name = 'to_belarus_date-index'
-            key_condition = Key('dummy_partition_key').eq('constant') & Key('to_belarus_date').between(str(from_date),
-                                                                                                       str(to_date))
+            key_condition = (Key('dummy_partition_key').eq('constant') &
+                             Key('to_belarus_date').between(str(from_date), str(to_date)))
         else:  # If interested in trip to Spain
             index_name = 'to_spain_date-index'
-            key_condition = Key('dummy_partition_key').eq('constant') & Key('to_spain_date').between(str(from_date),
-                                                                                                     str(to_date))
+            key_condition = (Key('dummy_partition_key').eq('constant') &
+                             Key('to_spain_date').between(str(from_date), str(to_date)))
         # Query DynamoDB.
         response = table.query(
             IndexName=index_name,
@@ -218,6 +219,7 @@ def get_trips(is_to_belarus, yyyy, mm):
         return response['Items']
     except (BotoCoreError, ClientError, ValueError) as error:
         logger.error(f"Failed to get trips: {error}")
+        return None
 
 
 def parse_date(date_string):
@@ -266,17 +268,17 @@ def generate_get_trips_msg(user_id):
                                f"Дата поездки в Беларусь: {trip['to_belarus_date']},\n" \
                                f"Дата поездки в Испанию: {trip['to_spain_date']},\n" \
                                f"Примечание: {trip['note']}\n\n"
-            button = [{f"text": f"Удалить поездку {i}.", "callback_data": f"/deletetrip_{trip['trip_id']}"}]
+            button = [{"text": f"Удалить поездку {i}.", "callback_data": f"/deletetrip_{trip['trip_id']}"}]
             local_getmytrips_inline_keyboard["inline_keyboard"].insert(i - 1, button)
     return getmytrips_text, local_getmytrips_inline_keyboard
 
 
 def handle_startcallback(chat_id, message_id):
-    send_editMessageText(chat_id, message_id, GREETING_TEXT, reply_markup=GREETING_INLINE_KEYBOARD)
+    send_edit_message_text(chat_id, message_id, GREETING_TEXT, reply_markup=GREETING_INLINE_KEYBOARD)
 
 
 def handle_searchtrips(chat_id, message_id):
-    send_editMessageText(chat_id, message_id, SEARCH_INTRO_TEXT, reply_markup=SEARCH_INTRO_INLINE_KEYBOARD)
+    send_edit_message_text(chat_id, message_id, SEARCH_INTRO_TEXT, reply_markup=SEARCH_INTRO_INLINE_KEYBOARD)
 
 
 def handle_searchbelarusdate(chat_id):
@@ -293,14 +295,14 @@ def handle_savetrip(chat_id):
 
 def handle_getmytrips(chat_id, user_id, message_id):
     text, inline_keyboard = generate_get_trips_msg(user_id)
-    send_editMessageText(chat_id, message_id, text, reply_markup=inline_keyboard, parse_mode="HTML")
+    send_edit_message_text(chat_id, message_id, text, reply_markup=inline_keyboard, parse_mode="HTML")
 
 
 def handle_deletetrip(callback_query_data, chat_id, user_id, message_id):
     trip_id = callback_query_data.split("_")[1]
     delete_trip(user_id, trip_id)
     text, inline_keyboard = generate_get_trips_msg(user_id)
-    send_editMessageText(chat_id, message_id, text, reply_markup=inline_keyboard, parse_mode="HTML")
+    send_edit_message_text(chat_id, message_id, text, reply_markup=inline_keyboard, parse_mode="HTML")
 
 
 def handle_callback_query(update):
@@ -334,10 +336,10 @@ def handle_callback_query(update):
     elif callback_query_data.startswith("/deletetrip_"):
         handle_deletetrip(callback_query_data, chat_id, user_id, message_id)
     else:
-        send_answerCallbackQuery(callback_query_id, text="Something went wrong", show_alert=True)
+        send_answer_callback_query(callback_query_id, text="Something went wrong", show_alert=True)
         logger.error("Unknown callback")
-        raise Exception
-    send_answerCallbackQuery(callback_query_id)
+        raise RuntimeError
+    send_answer_callback_query(callback_query_id)
 
 
 def handle_start(chat_id):
@@ -433,13 +435,13 @@ def handle_text_message(update):
     for key in update.keys():
         logger.debug(f"{key}: {update[key]}\n")
 
-    if user_input.lower() == START_COMMAND:
-        handle_start(chat_id)
-    elif user_input.lower() == ABOUT_COMMAND:
-        handle_about(chat_id)
-    elif user_input.lower() == HELP_COMMAND:
-        handle_help(chat_id)
-
+    commands = {
+        START_COMMAND: handle_start,
+        ABOUT_COMMAND: handle_about,
+        HELP_COMMAND: handle_help
+    }
+    if user_input.lower() in commands:
+        commands[user_input.lower()](chat_id)
     else:
         if "reply_to_message" in message:
             reply_message_text = message["reply_to_message"]["text"]
@@ -479,7 +481,7 @@ def lambda_handler(event, context):
         update = json.loads(event['body'])
         process_update(update)
         return event_processed
-    except Exception as E:
+    except Exception as error:
         logger.error("Something went terribly wrong. Bot crashed")
-        logger.error(E)
+        logger.error(error)
         return event_processed
